@@ -1,112 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Generation Web App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        #video-player {
-            display: none;
-            margin-top: 20px;
-        }
-        #loading {
-            display: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generate a Video</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background-color: #fff; /* White background */
+  color: #000; /* Black text */
+  margin: 0;
+  padding: 50px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 24px;
+  color: #000; /* Black */
+  margin-bottom: 20px;
+}
+
+textarea, select, button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-bottom: 20px;
+  background-color: #fff; /* White background */
+  border: 2px solid #000; /* Black border */
+  color: #000; /* Black text */
+  outline: none;
+  box-sizing: border-box;
+  border-radius: 4px; /* Slightly rounded corners */
+}
+
+/* Revert to default dropdown arrow */
+select {
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  padding-right: 40px; /* Space for the default arrow */
+  background-color: #fff; /* White background */
+  appearance: auto; /* Use the browser's default arrow */
+  -webkit-appearance: select; /* For Safari */
+  -moz-appearance: none; /* For Firefox */
+}
+
+/* Hover and focus states for select element */
+select:hover, select:focus {
+  border-color: #333; /* Darker border on hover/focus */
+  background-color: #f5f5f5; /* Light gray background on hover/focus */
+}
+
+/* Button Styling */
+button {
+  background-color: #000; /* Black background */
+  color: white; /* White text */
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #333; /* Darker black on hover */
+}
+
+button:disabled {
+  background-color: #ccc; /* Light gray when disabled */
+  cursor: not-allowed;
+}
+
+.loading {
+  display: none;
+  font-size: 14px;
+  color: #000;
+}
+
+#video-player {
+  display: none;
+  margin-top: 20px;
+}
+
+.error {
+  color: #e74c3c;
+  margin-top: 15px;
+}
+</style>
 </head>
 <body>
 
-    <h1>Generate a Video</h1>
+<h1>Generate a Video</h1>
 
-    <!-- Text Input -->
-    <label for="input-text">Enter Text:</label>
-    <textarea id="input-text" rows="4" cols="50" placeholder="Enter your message here"></textarea><br><br>
+<textarea id="input-text" rows="3" placeholder="Enter your message"></textarea>
 
-    <!-- Avatar Drop-down -->
-    <label for="avatar-select">Choose Avatar:</label>
-    <select id="avatar-select">
-        <option value="d5f8392d-f679-499e-bd09-7e8e01865684">Santa</option>
-        <option value="another-avatar-id">Avatar 2</option>
-        <option value="yet-another-avatar-id">Avatar 3</option>
-    </select><br><br>
+<!-- Enhanced Dropdown with default browser arrow -->
+<select id="avatar-select">
+  <option value="818b9ad8-b8bb-4c38-9eef-e16148a99186">Santa 1</option>
+  <option value="d5f8392d-f679-499e-bd09-7e8e01865684">Santa 2</option>
+  <option value="21ad315c-b956-4be8-8361-454d7c236cd3">Santa 3</option>
+</select>
 
-    <!-- Generate Video Button -->
-    <button id="generate-btn">Generate Video</button>
+<button id="generate-btn">Generate Video</button>
 
-    <!-- Loading Indicator -->
-    <div id="loading">Generating video...</div>
+<div id="loading" class="loading">Generating video...</div>
+<div id="error-message" class="error" style="display: none;"></div>
 
-    <!-- Video Player -->
-    <div id="video-player">
-        <video id="video" width="640" controls>
-            Your browser does not support the video tag.
-        </video>
-    </div>
+<div id="video-player">
+  <video id="video" width="640" controls>
+    Your browser does not support the video tag.
+  </video>
+</div>
 
-    <script>
-        const generateBtn = document.getElementById('generate-btn');
-        const inputText = document.getElementById('input-text');
-        const avatarSelect = document.getElementById('avatar-select');
-        const loadingDiv = document.getElementById('loading');
-        const videoPlayer = document.getElementById('video-player');
-        const videoElement = document.getElementById('video');
+<script>
+const generateBtn = document.getElementById('generate-btn');
+const inputText = document.getElementById('input-text');
+const avatarSelect = document.getElementById('avatar-select');
+const loadingDiv = document.getElementById('loading');
+const errorMessage = document.getElementById('error-message');
+const videoPlayer = document.getElementById('video-player');
+const videoElement = document.getElementById('video');
+let inferenceId = null;
+let pollInterval = null;
 
-        generateBtn.addEventListener('click', async () => {
-            const text = inputText.value;
-            const avatarId = avatarSelect.value;
+const checkVideoStatus = async () => {
+  try {
+    const response = await fetch(`https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video?inference_id=${inferenceId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
 
-            if (!text.trim()) {
-                alert('Please enter some text!');
-                return;
-            }
+    const videoData = await response.json();
+    if (videoData.generated) {
+      clearInterval(pollInterval);
+      videoElement.src = videoData.video_url;
+      videoPlayer.style.display = 'block';
+      loadingDiv.style.display = 'none';
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Video';
+    }
+  } catch (error) {
+    showError('Error fetching video status. Please try again.');
+  }
+};
 
-            loadingDiv.style.display = 'block';
-            videoPlayer.style.display = 'none';
+const showError = (message) => {
+  errorMessage.textContent = message;
+  errorMessage.style.display = 'block';
+  loadingDiv.style.display = 'none';
+  generateBtn.disabled = false;
+  generateBtn.textContent = 'Generate Video';
+};
 
-            // Step 1: Call the API to generate video
-            const response = await fetch('https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    avatar_id: avatarId,
-                    text: text
-                })
-            });
+const resetUI = () => {
+  // Reset text and video player
+  inputText.value = '';
+  videoElement.src = '';
+  videoPlayer.style.display = 'none';
+  errorMessage.style.display = 'none';
+};
 
-            const result = await response.json();
-            if (result && result.inference_id) {
-                // Step 2: Get the video URL
-                const inferenceId = result.inference_id;
+generateBtn.addEventListener('click', async () => {
+  const text = inputText.value;
+  const avatarId = avatarSelect.value;
 
-                const videoResponse = await fetch(`https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video?inference_id=${inferenceId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
+  if (!text.trim()) {
+    showError('Please enter some text!');
+    return;
+  }
 
-                const videoData = await videoResponse.json();
-                if (videoData.generated) {
-                    // Step 3: Display the video
-                    videoElement.src = videoData.video_url;
-                    videoPlayer.style.display = 'block';
-                } else {
-                    alert('Failed to generate video!');
-                }
-            } else {
-                alert('Error generating video!');
-            }
+  // Show loading indicator and disable button
+  loadingDiv.style.display = 'block';
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating...';
 
-            loadingDiv.style.display = 'none';
-        });
-    </script>
+  try {
+    // Step 1: Call the API to generate video
+    const response = await fetch('https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        avatar_id: avatarId,
+        text: text
+      })
+    });
+
+    const result = await response.json();
+    if (result && result.inference_id) {
+      inferenceId = result.inference_id;
+      // Step 2: Start polling to check video status
+      pollInterval = setInterval(checkVideoStatus, 2000); // Poll every 2 seconds
+    } else {
+      showError('Error generating video!');
+    }
+  } catch (error) {
+    showError('Error generating video. Please try again.');
+  }
+});
+</script>
 
 </body>
 </html>
-
