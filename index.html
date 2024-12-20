@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Generation Web App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #video-player {
+            display: none;
+            margin-top: 20px;
+        }
+        #loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Generate a Video</h1>
+
+    <!-- Text Input -->
+    <label for="input-text">Enter Text:</label>
+    <textarea id="input-text" rows="4" cols="50" placeholder="Enter your message here"></textarea><br><br>
+
+    <!-- Avatar Drop-down -->
+    <label for="avatar-select">Choose Avatar:</label>
+    <select id="avatar-select">
+        <option value="d5f8392d-f679-499e-bd09-7e8e01865684">Santa</option>
+        <option value="another-avatar-id">Avatar 2</option>
+        <option value="yet-another-avatar-id">Avatar 3</option>
+    </select><br><br>
+
+    <!-- Generate Video Button -->
+    <button id="generate-btn">Generate Video</button>
+
+    <!-- Loading Indicator -->
+    <div id="loading">Generating video...</div>
+
+    <!-- Video Player -->
+    <div id="video-player">
+        <video id="video" width="640" controls>
+            Your browser does not support the video tag.
+        </video>
+    </div>
+
+    <script>
+        const generateBtn = document.getElementById('generate-btn');
+        const inputText = document.getElementById('input-text');
+        const avatarSelect = document.getElementById('avatar-select');
+        const loadingDiv = document.getElementById('loading');
+        const videoPlayer = document.getElementById('video-player');
+        const videoElement = document.getElementById('video');
+
+        generateBtn.addEventListener('click', async () => {
+            const text = inputText.value;
+            const avatarId = avatarSelect.value;
+
+            if (!text.trim()) {
+                alert('Please enter some text!');
+                return;
+            }
+
+            loadingDiv.style.display = 'block';
+            videoPlayer.style.display = 'none';
+
+            // Step 1: Call the API to generate video
+            const response = await fetch('https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    avatar_id: avatarId,
+                    text: text
+                })
+            });
+
+            const result = await response.json();
+            if (result && result.inference_id) {
+                // Step 2: Get the video URL
+                const inferenceId = result.inference_id;
+
+                const videoResponse = await fetch(`https://15uqshjaq9.execute-api.ap-south-1.amazonaws.com/video?inference_id=${inferenceId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const videoData = await videoResponse.json();
+                if (videoData.generated) {
+                    // Step 3: Display the video
+                    videoElement.src = videoData.video_url;
+                    videoPlayer.style.display = 'block';
+                } else {
+                    alert('Failed to generate video!');
+                }
+            } else {
+                alert('Error generating video!');
+            }
+
+            loadingDiv.style.display = 'none';
+        });
+    </script>
+
+</body>
+</html>
+
